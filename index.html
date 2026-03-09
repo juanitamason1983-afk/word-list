@@ -31,19 +31,16 @@
             background: var(--white); position: relative; display: flex; flex-direction: column; overflow: hidden;
         }
 
-        /* 顶部进度 */
         .header { padding: 40px 30px 10px; }
         .progress-box { width: 100%; height: 16px; background: #F0F0F0; border-radius: 10px; overflow: hidden; }
         .progress-bar { width: 0%; height: 100%; background: linear-gradient(90deg, var(--secondary), var(--primary)); transition: 0.6s; }
         
-        /* 游戏主体 */
         .game-area { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 20px; }
         .word-card { text-align: center; }
         .syllables { font-size: 24px; color: var(--secondary); font-weight: bold; }
         .word-main { font-size: 56px; color: var(--primary); margin: 5px 0; }
         .meaning { font-size: 26px; color: #A0A0A0; }
 
-        /* 星星与反馈 */
         .stars-row { display: flex; gap: 15px; margin: 25px 0; }
         .star { font-size: 45px; color: #EEE; transition: 0.3s; }
         .star.active { color: var(--accent); transform: scale(1.2) rotate(10deg); text-shadow: 0 0 15px var(--accent); }
@@ -51,7 +48,7 @@
         .mic-icon {
             width: 100px; height: 100px; border-radius: 50%;
             background: #F8F9FA; display: flex; align-items: center; justify-content: center;
-            font-size: 45px; transition: 0.3s; margin-bottom: 10px;
+            font-size: 45px; transition: 0.3s; margin-bottom: 10px; cursor: pointer;
         }
         .mic-icon.listening {
             background: var(--secondary); color: white;
@@ -59,7 +56,6 @@
         }
         @keyframes pulse { 0% { transform: scale(1); } 50% { transform: scale(1.1); } 100% { transform: scale(1); } }
 
-        /* 高能量文本弹窗 */
         #praise-popup {
             position: absolute; top: 40%; left: 50%; transform: translate(-50%, -50%) scale(0);
             font-size: 60px; font-weight: 900; color: var(--accent); z-index: 100;
@@ -67,7 +63,6 @@
         }
         #praise-popup.animate { transform: translate(-50%, -50%) scale(1.2); }
 
-        /* 选项按钮 */
         .opt-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; width: 100%; }
         .opt-btn {
             background: #FFF; border: 3px solid #F0F0F0; padding: 18px;
@@ -75,7 +70,6 @@
         }
         .opt-btn.correct { background: var(--secondary); color: white; border-color: var(--secondary); }
 
-        /* 兼容性/提示弹窗 (重要) */
         .modal {
             position: fixed; inset: 0; background: rgba(0,0,0,0.85);
             display: none; flex-direction: column; align-items: center; justify-content: center;
@@ -90,7 +84,6 @@
             border-radius: 50px; font-size: 18px; margin-top: 20px; cursor: pointer;
         }
 
-        /* 拼写输入 */
         .spell-input {
             width: 80%; border: none; border-bottom: 5px solid var(--secondary);
             font-size: 40px; text-align: center; outline: none; margin-bottom: 25px;
@@ -116,7 +109,6 @@
 
     <div id="praise-popup">PERFECT!</div>
 
-    <!-- 启动屏 -->
     <div id="start-screen" class="overlay">
         <div style="font-size: 80px; margin-bottom: 20px;">🦖</div>
         <h1 style="font-size: 32px;">超级单词闯关</h1>
@@ -124,7 +116,6 @@
         <button onclick="bootApp()" style="background:white; color:var(--primary); border:none; padding:18px 50px; border-radius:50px; font-size:24px; font-weight:bold; margin-top:30px;">开启冒险</button>
     </div>
 
-    <!-- 兼容性/提示弹窗 -->
     <div id="msg-modal" class="modal">
         <div class="modal-card">
             <div id="modal-icon" style="font-size: 50px; margin-bottom: 10px;">⚠️</div>
@@ -138,7 +129,7 @@
 <script>
     /*
         =========================================
-       2. 核心逻辑与兼容性处理 (修复版)
+       2. 终极兼容性修复版 (专治 iOS Safari 假死)
        =========================================
     */
 
@@ -157,10 +148,59 @@
     let recognition = null;
     let isWechat = /MicroMessenger/i.test(navigator.userAgent);
     let audioCtx = null;
-    const SpeechConstructor = window.SpeechRecognition || window.webkitSpeechRecognition;
+    let isFirstTime = true; // 极其重要的状态位
+    window.__utterances =[]; // 修复 Safari 语音播报有时不触发 onend 的官方 Bug
 
-    // A. 引导启动：检测 API 环境并解锁系统限制
+    // 生成全新的语音识别实例
+    function createRecognitionEngine() {
+        const SpeechConstructor = window.SpeechRecognition || window.webkitSpeechRecognition;
+        const rec = new SpeechConstructor();
+        rec.lang = 'en-US';
+        rec.interimResults = false;
+        rec.maxAlternatives = 1;
+
+        rec.onresult = (e) => {
+            const result = e.results[0][0].transcript.toLowerCase();
+            const target = WORDS[curIdx].word.toLowerCase();
+            if (result.includes(target) || target.includes(result)) {
+                handleSuccess();
+            } else {
+                renderFeedback("Try again!");
+                setTimeout(() => {
+                    if (curPhase === 1) startStepLoop();
+                }, 1200);
+            }
+        };
+
+        rec.onerror = (e) => {
+            console.error('录音出错:', e.error);
+            const mic = document.getElementById('mic-box');
+            if (mic) mic.classList.remove('listening');
+            
+            if (e.error === 'not-allowed') {
+                showModal("麦克风权限被拒绝", "请在手机【设置】中找到浏览器，允许使用麦克风，然后刷新页面哦！", "🎤");
+            } else if (e.error === 'network') {
+                showModal("网络有点不稳定", "语音评分需要连接网络，请检查网络后再试~", "🌐");
+            } else if (e.error === 'no-speech') {
+                // 没听清，自动再进入一次循环
+                renderFeedback("Speak louder!");
+                setTimeout(() => {
+                    if (curPhase === 1) startStepLoop();
+                }, 1000);
+            }
+        };
+
+        rec.onend = () => {
+            const mic = document.getElementById('mic-box');
+            if(mic) mic.classList.remove('listening');
+        };
+
+        return rec;
+    }
+
+    // A. 引导启动
     function bootApp() {
+        const SpeechConstructor = window.SpeechRecognition || window.webkitSpeechRecognition;
         if (!SpeechConstructor) {
             if (isWechat) {
                 showModal("哎呀，微信内部暂不支持语音评分哦！", "请点击右上角三个点，选择【在浏览器/Safari中打开】获得完美体验~", "💡");
@@ -170,105 +210,69 @@
             return;
         }
 
-        // 首次点击直接解锁全局 AudioContext 和 SpeechSynthesis，避免后续卡死
+        // 【核心修复1】：第一次实例化必须在点击瞬间立刻执行！才能触发系统原生授权提示！
+        recognition = createRecognitionEngine();
+
+        // 静音播放一段声音，为后续解锁 Audio 上下文
         playDing(true); 
-        window.speechSynthesis.speak(new SpeechSynthesisUtterance(''));
+        const dummy = new SpeechSynthesisUtterance('');
+        dummy.volume = 0;
+        window.speechSynthesis.speak(dummy);
 
         document.getElementById('start-screen').style.display = 'none';
         render();
     }
 
-    // B. 重新实例化引擎 (解决 iOS/Safari "麦克风假死" 的核心函数)
+    // B. 开始录音 (包含重新实例化的防假死逻辑)
     function startListening() {
-        if (!SpeechConstructor) return;
-
-        // 1. 彻底销毁旧实例，释放系统音频占用
-        if (recognition) {
-            try { recognition.abort(); } catch(e) {}
+        // 【核心修复2】：除了第一次，后续所有的监听都必须销毁旧的，创建全新的
+        if (!isFirstTime) {
+            if (recognition) {
+                try { recognition.abort(); } catch(e) {}
+            }
+            recognition = createRecognitionEngine();
         }
+        
+        isFirstTime = false; // 标记第一次安全通过
 
-        // 2. 【关键】每次唤醒必须 new 一个全新的实例！否则在 Safari 100% 会假死！
-        recognition = new SpeechConstructor();
-        recognition.lang = 'en-US';
-        recognition.interimResults = false;
-        recognition.maxAlternatives = 1;
-
-        recognition.onresult = (e) => {
-            const result = e.results[0][0].transcript.toLowerCase();
-            const target = WORDS[curIdx].word.toLowerCase();
-            if (result.includes(target) || target.includes(result)) {
-                handleSuccess();
-            } else {
-                renderFeedback("Try again!");
-                // 识别错误时自动重试
-                setTimeout(() => {
-                    if (curPhase === 1) startStepLoop();
-                }, 1200);
-            }
-        };
-
-        recognition.onerror = (e) => {
-            console.error('Speech Error:', e.error);
-            const mic = document.getElementById('mic-box');
-            if (mic) mic.classList.remove('listening');
-            
-            if (e.error === 'not-allowed') {
-                showModal("麦克风权限被拒绝", "请在手机【设置】中找到浏览器，允许使用麦克风，然后刷新页面哦！", "🎤");
-            } else if (e.error === 'network') {
-                showModal("网络有点不稳定", "语音评分需要连接网络，请检查网络后再试~", "🌐");
-            } else if (e.error === 'aborted') {
-                // 程序主动打断，忽略
-            } else if (e.error === 'no-speech') {
-                // 没听到声音
-                renderFeedback("Speak louder!");
-                setTimeout(() => {
-                    if (curPhase === 1) startStepLoop();
-                }, 1000);
-            }
-        };
-
-        recognition.onend = () => {
-            const mic = document.getElementById('mic-box');
-            if(mic) mic.classList.remove('listening');
-        };
-
-        // 3. 开启全新实例
         try {
             const mic = document.getElementById('mic-box');
             if(mic) mic.classList.add('listening');
             recognition.start();
         } catch (err) {
-            console.error("麦克风启动异常:", err);
+            console.error("启动录音失败:", err);
             const mic = document.getElementById('mic-box');
             if(mic) mic.classList.remove('listening');
         }
     }
 
-    // 手动点击麦克风唤醒
+    // 手动点击麦克风唤醒（以防万一卡死，随时可以按麦克风重置）
     function onMicClick() {
         if (curPhase !== 1) return;
-        // 打断 APP 当前正在说的英语，直接跳到录音状态
-        window.speechSynthesis.cancel();
-        startListening();
+        window.speechSynthesis.cancel(); // 立即打断当前所有英语播报
+        setTimeout(() => {
+            startListening();
+        }, 300); // 留出一点时间释放焦点
     }
 
     // C. 听-说 循环逻辑 (自动流)
     function startStepLoop() {
         if (curPhase !== 1) return;
         
-        // APP说话前，务必强制关闭麦克风，防止 iOS 抢夺系统麦克风焦点导致崩溃
+        // APP说话前，必须关闭麦克风，防止 iOS 发生麦克风和扬声器的通道互锁
         if (recognition) {
             try { recognition.abort(); } catch(e) {}
         }
-        
         const mic = document.getElementById('mic-box');
         if (mic) mic.classList.remove('listening');
 
         const wordAudio = highEnergySpeak(WORDS[curIdx].word);
         
         wordAudio.onend = () => {
-            // 读完后立刻触发重新监听
-            startListening();
+            // 【核心修复3】：等待 500ms，让系统彻底释放播报占用的音频通道。如果立刻启动极易假死！
+            setTimeout(() => {
+                if (curPhase === 1) startListening();
+            }, 500);
         };
         
         window.speechSynthesis.speak(wordAudio);
@@ -276,7 +280,7 @@
 
     // D. 成功后的高能量反馈
     function handleSuccess() {
-        // 成功后立即关闭麦克风，防止把后续系统赞美的声音录进去
+        // 成功后立即切断麦克风，避免把后面机器的表扬录进去
         if (recognition) {
             try { recognition.abort(); } catch(e) {}
         }
@@ -312,7 +316,7 @@
         window.speechSynthesis.speak(praiseAudio);
     }
 
-    // E. 语音合成设置 (赞美专用)
+    // E. 语音合成设置 (带防垃圾回收)
     function highEnergySpeak(text, isPraise = false) {
         const utter = new SpeechSynthesisUtterance(text);
         utter.lang = 'en-US';
@@ -321,6 +325,10 @@
         } else {
             utter.rate = 0.8; utter.pitch = 1.0;
         }
+        // 挂载到全局变量，防止 Safari 过早垃圾回收导致永远不触发 onend
+        window.__utterances.push(utter);
+        if(window.__utterances.length > 5) window.__utterances.shift();
+        
         return utter;
     }
 
@@ -343,9 +351,9 @@
                 <div class="stars-row" id="star-row">
                     <span class="star">★</span><span class="star">★</span><span class="star">★</span>
                 </div>
-                <!-- 增加了 onclick="onMicClick()" 保证假死时随时可以手动重置唤醒麦克风 -->
-                <div class="mic-icon" id="mic-box" onclick="onMicClick()" style="cursor:pointer;" title="点击手动唤醒">🎤</div>
-                <p style="color:#CCC; font-size:14px;">APP读完后跟着读 (也可随时点击麦克风)</p>
+                <!-- 增加了 onclick="onMicClick()" 保证卡此时可随时手动点图标 -->
+                <div class="mic-icon" id="mic-box" onclick="onMicClick()" title="可手动点击重置唤醒">🎤</div>
+                <p style="color:#CCC; font-size:14px;">APP读完后跟着读 (如果没反应请点击麦克风)</p>
             `;
             startStepLoop();
         } 
@@ -436,7 +444,6 @@
         return ["AWESOME!", "PERFECT!", "COOL!", "WOW!"][Math.floor(Math.random()*4)];
     }
 
-    // 修改版音效生成（复用全局 audioCtx 避免 Safari 限制或内存泄漏）
     function playDing(silent = false) {
         if (!audioCtx) {
             audioCtx = new (window.AudioContext || window.webkitAudioContext)();
@@ -444,7 +451,7 @@
         if (audioCtx.state === 'suspended') {
             audioCtx.resume();
         }
-        if (silent) return; // silent 专用于首屏静音解锁环境
+        if (silent) return; 
 
         const osc = audioCtx.createOscillator();
         const g = audioCtx.createGain();
