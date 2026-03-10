@@ -50,6 +50,14 @@
             background: var(--secondary); color: white;
             animation: pulse 1s infinite; box-shadow: 0 0 25px rgba(78,205,196,0.5);
         }
+        /* 麦克风互斥锁禁用状态 */
+        .mic-icon.disabled {
+            background: #E0E0E0 !important;
+            color: #999 !important;
+            cursor: not-allowed;
+            animation: none;
+            box-shadow: none;
+        }
         @keyframes pulse { 0% { transform: scale(1); } 50% { transform: scale(1.1); } 100% { transform: scale(1); } }
 
         #praise-popup {
@@ -174,14 +182,15 @@
     let curPhase = 1;
     let stars = 0;
 
-    // --- iOS 麦克风核心状态管理 ---
+    // --- 【防崩防线】：全局唯一实例化、互斥锁状态 ---
     const SpeechConstructor = window.SpeechRecognition || window.webkitSpeechRecognition;
-    let currentRecognition = null; 
+    let recognition = null;       // 规则1：全局单例，坚决不反复 new
+    let isSpeaking = false;       // 规则2：播报与录音互斥锁
     let isRecognizing = false;
     let isTransitioning = false;
     let lastMicTap = 0;
 
-    // --- 极其严密的会话状态持久化 (为了防意外崩溃，我们依然保留存盘好习惯) ---
+    // --- 会话状态持久化 ---
     function saveSession() {
         localStorage.setItem('app_session_day', currentDay);
         localStorage.setItem('app_session_curIdx', curIdx);
@@ -198,7 +207,7 @@
 
     // 核心：每日任务分发器
     function generateDailyTasks() {
-        let newQueue = [];
+        let newQueue =[];
         let reviewQueue =[];
         let learnedBeforeTodayCount = 0;
 
@@ -250,8 +259,69 @@
     }
 
     /* =========================================
-       2. iOS 专属：静音清场 + 暴力超度 + 300ms延迟重启
+       2. 底层架构：单例初始化、互斥锁机制与安全启动
        ========================================= */
+
+    // 嘴巴出声，耳朵闭嘴，UI 变灰禁用
+    function lockMic() {
+        isSpeaking = true;
+        const mic = document.getElementById('mic-box');
+        if (mic) mic.classList.add('disabled');
+    }
+
+    // 播报完毕，解除禁用，允许录音
+    function unlockMic() {
+        isSpeaking = false;
+        const mic = document.getElementById('mic-box');
+        if (mic) mic.classList.remove('disabled');
+    }
+
+    function resetMicUI() {
+        const mic = document.getElementById('mic-box');
+        if (mic) mic.classList.remove('listening');
+    }
+
+    // 规则 1：只初始化一次的强力单例
+    function initRecognitionOnce() {
+        if (recognition || !SpeechConstructor) return;
+
+        recognition = new SpeechConstructor();
+        // 规则 2：强制单次识别，绝不拖泥带水
+        recognition.continuous = false;
+        recognition.lang = 'en-US';
+        recognition.interimResults = false;
+        recognition.maxAlternatives = 1;
+
+        recognition.onstart = () => { 
+            isRecognizing = true; 
+            const mic = document.getElementById('mic-box');
+            if (mic && !isSpeaking) mic.classList.add('listening'); 
+        };
+        
+        recognition.onresult = (e) => {
+            if (curPhase !== 1 || isTransitioning) return;
+            const result = e.results[0][0].transcript.toLowerCase();
+            const target = todayWords[curIdx].word.toLowerCase();
+            if (result.includes(target) || target.includes(result)) {
+                handleSuccess();
+            } else {
+                renderFeedback("Try again!");
+                setTimeout(startStepLoop, 1200);
+            }
+        };
+
+        // 彻底去除非法弹窗干扰，静默恢复 UI 状态闭环
+        recognition.onerror = () => {
+            isRecognizing = false; 
+            resetMicUI();
+        };
+
+        recognition.onend = () => { 
+            isRecognizing = false; 
+            resetMicUI(); 
+        };
+    }
+
     function bootApp() {
         if (!SpeechConstructor) {
             showModal("当前浏览器不支持录音", "建议使用 Chrome、Safari 或系统自带浏览器打开哦！", "❌");
@@ -261,6 +331,7 @@
         window.speechSynthesis.speak(new SpeechSynthesisUtterance(''));
         document.getElementById('start-screen').style.display = 'none';
         
+        initRecognitionOnce(); // 唯一初始化点
         generateDailyTasks();
 
         if (todayWords.length === 0) {
@@ -270,99 +341,14 @@
         render();
     }
 
-    // 终极护盾：1.静音清场  2.暴力超度
-    function cleanupSpeech() {
-        try { window.speechSynthesis.cancel(); } catch(e) {}
-        
-        if (currentRecognition) {
-            try { currentRecognition.abort(); } catch(e) {}
-            currentRecognition = null;
+    // 规则 3：最极致安全的启动逻辑
+    function safeStartRecognition() {
+        if (!recognition || curPhase !== 1 || isTransitioning || isSpeaking) return;
+        try {
+            recognition.start();
+        } catch (err) {
+            console.warn("Recognition start safely ignored:", err);
         }
-        isRecognizing = false;
-        resetMicUI();
-    }
-
-    // 【完美单页延迟重建法】
-    function startFreshRecognition() {
-        if (!SpeechConstructor || curPhase !== 1 || isTransitioning) return;
-
-        // 步骤 1 & 2：静音清场 + 彻底摧毁旧实例
-        cleanupSpeech();
-
-        // 步骤 3：给系统底层喘息时间，核心救命 300ms！
-        setTimeout(() => {
-            if (curPhase !== 1 || isTransitioning) return;
-
-            // 再次双重确保超度干净
-            if (currentRecognition) {
-                try { currentRecognition.abort(); } catch (e) { }
-                currentRecognition = null;
-            }
-
-            let recognition = new SpeechConstructor();
-            currentRecognition = recognition;
-
-            // 步骤 4：强制单次识别
-            recognition.continuous = false;
-            recognition.lang = 'en-US';
-            recognition.interimResults = false;
-            recognition.maxAlternatives = 1;
-
-            recognition.onstart = () => { 
-                isRecognizing = true; 
-                document.getElementById('mic-box')?.classList.add('listening'); 
-            };
-            
-            recognition.onresult = (e) => {
-                if (curPhase !== 1 || isTransitioning) return;
-                const result = e.results[0][0].transcript.toLowerCase();
-                const target = todayWords[curIdx].word.toLowerCase();
-                if (result.includes(target) || target.includes(result)) {
-                    handleSuccess();
-                } else {
-                    renderFeedback("Try again!");
-                    setTimeout(startStepLoop, 1200);
-                }
-            };
-
-            recognition.onerror = (e) => {
-                isRecognizing = false; 
-                resetMicUI();
-
-                // 彻底干掉报错弹窗，使用 abort 默默释放内存
-                try { recognition.abort(); } catch(err) {}
-                if (currentRecognition === recognition) currentRecognition = null;
-
-                if (e.error === 'not-allowed') {
-                    showModal("麦克风已准备好", "请再按一次麦克风开始录音！🎤\n(若始终不行，请在设置中允许权限)", "🎤");
-                } else if (e.error === 'network') {
-                    showModal("网络有点不稳定", "语音评分需要连接网络，请查网后重试~", "🌐");
-                } else if (e.error === 'no-speech' && curPhase === 1 && !isTransitioning) {
-                    // 没有听到声音，给予系统 300ms 缓冲后安全自动重试
-                    setTimeout(startStepLoop, 300);
-                }
-                // aborted 等异常静默处理，保证 UI 是可恢复重点击状态
-            };
-
-            recognition.onend = () => { 
-                isRecognizing = false; 
-                resetMicUI(); 
-                
-                // 彻底释放
-                try { recognition.abort(); } catch(err) {}
-                if (currentRecognition === recognition) currentRecognition = null;
-            };
-
-            try {
-                recognition.start();
-            } catch (err) {
-                console.warn("Recognition start failed:", err);
-                isRecognizing = false; 
-                resetMicUI();
-                currentRecognition = null;
-            }
-
-        }, 300); 
     }
 
     function manualStartMic(e) {
@@ -371,28 +357,35 @@
         if (now - lastMicTap < 800) return;
         lastMicTap = now;
 
-        // 点击时会直接调用 startFreshRecognition，里面已经包含了 cancel、abort 和 300ms 的延迟！
-        startFreshRecognition(); 
+        // 绝对互斥：如果系统在出声，直接拦截任何录音行为！
+        if (isSpeaking) return;
+
+        safeStartRecognition(); 
     }
 
     /* =========================================
-       3. 核心互动与渲染逻辑 (彻底废弃 Reload)
+       3. 核心互动与渲染逻辑 (严守锁闭环)
        ========================================= */
     function startStepLoop() {
         if (curPhase !== 1 || isTransitioning) return;
         
-        // 确保读音前清场
-        cleanupSpeech();
+        try { window.speechSynthesis.cancel(); } catch(e){}
+        unlockMic(); // 强制清理残留状态
 
         const wordAudio = highEnergySpeak(todayWords[curIdx].word);
         let audioFired = false;
         
-        wordAudio.onend = () => {
+        lockMic(); // 播报前上锁，禁用麦克风
+        const nextAction = () => {
             if(audioFired) return; audioFired = true;
-            if (curPhase === 1 && !isTransitioning) startFreshRecognition();
+            unlockMic(); // 播报完立刻解锁
+            if (curPhase === 1 && !isTransitioning) safeStartRecognition();
         };
+
+        wordAudio.onend = nextAction;
+        wordAudio.onerror = nextAction;
         
-        setTimeout(() => { if (!audioFired) wordAudio.onend(); }, 2500);
+        setTimeout(() => { if (!audioFired) nextAction(); }, 2500);
         window.speechSynthesis.speak(wordAudio);
     }
 
@@ -400,10 +393,12 @@
         if (isTransitioning) return;
         isTransitioning = true;
         
-        stars++; // 每成功一次，星星直接 +1
+        stars++; // 读对加星
         
-        // 立刻闭麦清场，绝不允许边播表扬边开麦
-        cleanupSpeech(); 
+        try { window.speechSynthesis.cancel(); } catch(e){}
+        unlockMic(); 
+        try { recognition.stop(); } catch(e) {} // 温和地通知底层结束，不暴力销毁
+        resetMicUI();
         
         const praiseObj = PRAISES[Math.floor(Math.random() * PRAISES.length)];
         renderFeedback(praiseObj.text);
@@ -412,21 +407,22 @@
         const praiseAudio = highEnergySpeak(praiseObj.speech, true);
         let audioFired = false;
         
+        lockMic(); // 表扬播报前上锁
         const nextStep = () => {
             if(audioFired) return; audioFired = true;
+            unlockMic(); // 表扬结束，解锁
             isTransitioning = false;
 
             if (curPhase === 1) {
                 if (stars < todayWords[curIdx].requiredStars) {
                     updateStars(); 
                     saveSession(); 
-                    // [彻底废除 Reload，使用 SPA 无缝延迟进入下一拍]
+                    // 彻底回到单页应用逻辑，无缝进入下一拍跟读
                     setTimeout(startStepLoop, 400);
                 } else {
                     curPhase = 2;
                     saveSession(); 
-                    // [彻底废除 Reload，直接无刷新渲染下一环节]
-                    render();
+                    render(); // 无缝渲染下一环节
                 }
             } else if (curPhase === 2) {
                 curPhase = 3; 
@@ -448,6 +444,7 @@
             }
         };
 
+        praiseAudio.onerror = nextStep;
         praiseAudio.onend = nextStep;
         setTimeout(nextStep, 2500);
         window.speechSynthesis.speak(praiseAudio);
@@ -455,7 +452,10 @@
 
     function render() {
         isTransitioning = false; 
-        cleanupSpeech(); 
+        try { window.speechSynthesis.cancel(); } catch(e){}
+        unlockMic();
+        try { recognition.stop(); } catch(e){}
+        resetMicUI();
 
         const view = document.getElementById('game-view');
         const wordObj = todayWords[curIdx];
@@ -483,7 +483,6 @@
                 <p style="color:#CCC; font-size:14px; text-align:center;">APP读完后请跟读<br/>(没听清可点击麦克风重试)</p>
             `;
             
-            // 恢复之前因为断网或刷新残留的星星数
             updateStars();
             startStepLoop();
         } 
@@ -510,10 +509,6 @@
     /* =========================================
        4. 基础辅助与 UI 函数
        ========================================= */
-    function resetMicUI() {
-        const mic = document.getElementById('mic-box');
-        if (mic) mic.classList.remove('listening');
-    }
 
     function highEnergySpeak(text, isPraise = false) {
         const utter = new SpeechSynthesisUtterance(text);
@@ -525,7 +520,16 @@
 
     function repeatWord() {
         try { window.speechSynthesis.cancel(); } catch(e){}
-        window.speechSynthesis.speak(highEnergySpeak(todayWords[curIdx].word));
+        unlockMic(); 
+        
+        const audio = highEnergySpeak(todayWords[curIdx].word);
+        lockMic(); // 上锁
+        
+        const done = () => unlockMic();
+        audio.onend = done;
+        audio.onerror = done;
+        
+        window.speechSynthesis.speak(audio);
     }
 
     function renderChoices(correct) {
@@ -594,7 +598,11 @@
     function closeModal() { document.getElementById('msg-modal').style.display = 'none'; }
 
     function showWin(msg) {
-        cleanupSpeech();
+        try { window.speechSynthesis.cancel(); } catch(e){}
+        unlockMic();
+        try { recognition.stop(); } catch(e){}
+        resetMicUI();
+
         document.getElementById('header-area').style.display = 'none';
         const app = document.getElementById('game-view');
         app.innerHTML = `
@@ -619,6 +627,7 @@
                 stars = savedStars ? parseInt(savedStars) : 0; 
                 
                 document.getElementById('start-screen').style.display = 'none';
+                initRecognitionOnce(); // 恢复时同样初始化单例引擎
                 generateDailyTasks();
                 
                 if (curIdx >= todayWords.length) {
