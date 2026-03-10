@@ -6,7 +6,7 @@
     <title>Magic English - 单词森林大冒险</title>
     <style>
         /* 
-           =========================================
+            =========================================
            1. 游戏化视觉系统 (保持高能量马卡龙风)
            =========================================
         */
@@ -129,7 +129,7 @@
         <div class="modal-card">
             <div id="modal-icon" style="font-size: 50px; margin-bottom: 10px;">⚠️</div>
             <h3 id="modal-title">提示</h3>
-            <p id="modal-text" style="color: #666; line-height: 1.6;">环境异常</p>
+            <p id="modal-text" style="color: #666; line-height: 1.6; white-space: pre-wrap;">环境异常</p>
             <button class="modal-btn" onclick="closeModal()">好 的</button>
         </div>
     </div>
@@ -137,158 +137,61 @@
 
 <script>
     /* 
-       =========================================
+        =========================================
        2. 核心逻辑与兼容性处理
        =========================================
     */
 
-    const WORDS = [
-       {
-    word: "gray",
-    syllables: "gray",
-    meaning: "灰色的"
-  },
-  {
-    word: "duckling",
-    syllables: "duck-ling",
-    meaning: "小鸭子"
-  },
-  {
-    word: "different",
-    syllables: "dif-fer-ent",
-    meaning: "不同的"
-  },
-  {
-    word: "says",
-    syllables: "says",
-    meaning: "说"
-  },
-  {
-    word: "little",
-    syllables: "lit-tle",
-    meaning: "小的"
-  },
-  {
-    word: "another",
-    syllables: "an-oth-er",
-    meaning: "另外的"
-  },
-  {
-    word: "pond",
-    syllables: "pond",
-    meaning: "池塘"
-  },
-  {
-    word: "lovely",
-    syllables: "love-ly",
-    meaning: "可爱的"
-  },
-  {
-    word: "summer",
-    syllables: "sum-mer",
-    meaning: "夏天"
-  },
-  {
-    word: "farm",
-    syllables: "farm",
-    meaning: "农场"
-  },
-  {
-    word: "ugly",
-    syllables: "ug-ly",
-    meaning: "丑的"
-  },
-  {
-    word: "go away",
-    syllables: "go a-way",
-    meaning: "走开"
-  },
-  {
-    word: "animals",
-    syllables: "an-i-mals",
-    meaning: "动物"
-  },
-  {
-    word: "from the farm",
-    syllables: "from the farm",
-    meaning: "来自农场"
-  },
-  {
-    word: "who",
-    syllables: "who",
-    meaning: "谁"
-  },
-  {
-    word: "autumn",
-    syllables: "au-tumn",
-    meaning: "秋天"
-  },
-  {
-    word: "winter",
-    syllables: "win-ter",
-    meaning: "冬天"
-  },
-  {
-    word: "farmhouse",
-    syllables: "farm-house",
-    meaning: "农场房子"
-  },
-  {
-    word: "give",
-    syllables: "give",
-    meaning: "给"
-  },
-  {
-    word: "some",
-    syllables: "some",
-    meaning: "一些"
-  },
-  {
-    word: "play with",
-    syllables: "play with",
-    meaning: "和...一起玩"
-  },
-  {
-    word: "river",
-    syllables: "riv-er",
-    meaning: "河流"
-  },
-  {
-    word: "hide",
-    syllables: "hide",
-    meaning: "躲起来"
-  },
-  {
-    word: "spring",
-    syllables: "spring",
-    meaning: "春天"
-  },
-  {
-    word: "swan",
-    syllables: "swan",
-    meaning: "天鹅"
-  },
-  {
-    word: "where",
-    syllables: "where",
-    meaning: "哪里"
-  },
-  {
-    word: "isn't",
-    syllables: "is-n't",
-    meaning: "不是"
-  }
+    const WORDS =[
+      { word: "gray", syllables: "gray", meaning: "灰色的" },
+      { word: "duckling", syllables: "duck-ling", meaning: "小鸭子" },
+      { word: "different", syllables: "dif-fer-ent", meaning: "不同的" },
+      { word: "says", syllables: "says", meaning: "说" },
+      { word: "little", syllables: "lit-tle", meaning: "小的" },
+      { word: "another", syllables: "an-oth-er", meaning: "另外的" },
+      { word: "pond", syllables: "pond", meaning: "池塘" },
+      { word: "lovely", syllables: "love-ly", meaning: "可爱的" },
+      { word: "summer", syllables: "sum-mer", meaning: "夏天" },
+      { word: "farm", syllables: "farm", meaning: "农场" },
+      { word: "ugly", syllables: "ug-ly", meaning: "丑的" },
+      { word: "go away", syllables: "go a-way", meaning: "走开" },
+      { word: "animals", syllables: "an-i-mals", meaning: "动物" },
+      { word: "from the farm", syllables: "from the farm", meaning: "来自农场" },
+      { word: "who", syllables: "who", meaning: "谁" },
+      { word: "autumn", syllables: "au-tumn", meaning: "秋天" },
+      { word: "winter", syllables: "win-ter", meaning: "冬天" },
+      { word: "farmhouse", syllables: "farm-house", meaning: "农场房子" },
+      { word: "give", syllables: "give", meaning: "给" },
+      { word: "some", syllables: "some", meaning: "一些" },
+      { word: "play with", syllables: "play with", meaning: "和...一起玩" },
+      { word: "river", syllables: "riv-er", meaning: "河流" },
+      { word: "hide", syllables: "hide", meaning: "躲起来" },
+      { word: "spring", syllables: "spring", meaning: "春天" },
+      { word: "swan", syllables: "swan", meaning: "天鹅" },
+      { word: "where", syllables: "where", meaning: "哪里" },
+      { word: "isn't", syllables: "is-n't", meaning: "不是" }
+    ];
+
+    // [修复 Bug 1] 将表扬语和音频强绑定，确保音画一致
+    const PRAISES =[
+        { text: "WOW!", speech: "Wow!" },
+        { text: "AMAZING!", speech: "Amazing!" },
+        { text: "PERFECT!", speech: "Perfect!" },
+        { text: "EXCELLENT!", speech: "Excellent!" },
+        { text: "AWESOME!", speech: "Awesome!" },
+        { text: "SUPERSTAR!", speech: "You're a superstar!" }
     ];
 
     let curIdx = 0;
-    let curPhase = 1; 
+    let curPhase = 1;
+
     let stars = 0;
     let recognition = null;
     let isWechat = /MicroMessenger/i.test(navigator.userAgent);
+    let lastMicTap = 0; // 防抖时间戳
 
     // A. 引导启动：检测 API 环境
     function bootApp() {
-        // 同时支持原生和 webkit 前缀
         const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
 
         if (!SpeechRecognition) {
@@ -312,6 +215,12 @@
         recognition.interimResults = false;
         recognition.maxAlternatives = 1;
 
+        //[修复 Bug 2] 使用 onstart 严谨处理 UI 状态变更
+        recognition.onstart = () => {
+            const mic = document.getElementById('mic-box');
+            if (mic) mic.classList.add('listening');
+        };
+
         recognition.onresult = (e) => {
             const result = e.results[0][0].transcript.toLowerCase();
             const target = WORDS[curIdx].word.toLowerCase();
@@ -325,22 +234,60 @@
 
         recognition.onerror = (e) => {
             console.error('Speech Error:', e.error);
-            document.getElementById('mic-box').classList.remove('listening');
+            resetMicUI(); // 清除界面动效
             
-            if (e.error === 'not-allowed') {
-                showModal("麦克风权限被拒绝", "请在手机【设置】中找到浏览器，允许使用麦克风，然后刷新页面哦！", "🎤");
+            // 严谨地结束识别，防止底层进程卡死
+            try { recognition.stop(); } catch(err){}
+
+            // [修复 Bug 2] 捕获权限打断，给出引导操作
+            if (e.error === 'not-allowed' || e.error === 'aborted') {
+                showModal("麦克风已准备好", "请再按一次麦克风开始录音！🎤\n(若始终不行，请在设置中允许权限)", "🎤");
             } else if (e.error === 'network') {
                 showModal("网络有点不稳定", "语音评分需要连接网络，请检查网络后再试~", "🌐");
             } else if (e.error === 'no-speech') {
-                // 没听到声音，自动重新开始
+                // 没听到声音，可以再次循环或等待用户主动点击
                 startStepLoop();
             }
         };
 
         recognition.onend = () => {
-            const mic = document.getElementById('mic-box');
-            if(mic) mic.classList.remove('listening');
+            resetMicUI();
+            try { recognition.stop(); } catch(err){}
         };
+    }
+
+    // [修复 Bug 2] 新增封装重置 UI 方法
+    function resetMicUI() {
+        const mic = document.getElementById('mic-box');
+        if (mic) mic.classList.remove('listening');
+    }
+
+    // [修复 Bug 2] 新增安全启动语音识别机制 (带有缓冲隔离，防止连续调用冲突)
+    function startRecognitionSafely() {
+        if (!recognition || curPhase !== 1) return;
+        
+        try { recognition.stop(); } catch(err) {}
+        resetMicUI();
+
+        setTimeout(() => {
+            try {
+                if (curPhase === 1) recognition.start();
+            } catch (err) {
+                console.error("Recognition start failed:", err);
+            }
+        }, 150); // 150ms 缓冲，确保前一个状态彻底释放
+    }
+
+    // [修复 Bug 2] 手动点击麦克风，支持多端触摸事件
+    function manualStartMic(e) {
+        if (e && e.cancelable) e.preventDefault(); // 阻止触摸双重触发
+
+        const now = Date.now();
+        if (now - lastMicTap < 500) return; // 点击防抖
+        lastMicTap = now;
+
+        window.speechSynthesis.cancel(); // 如果孩子按得早，取消当前机器的播报
+        startRecognitionSafely();
     }
 
     // C. 听-说 循环逻辑 (自动流)
@@ -351,13 +298,7 @@
         const wordAudio = highEnergySpeak(WORDS[curIdx].word);
         
         wordAudio.onend = () => {
-            try {
-                const mic = document.getElementById('mic-box');
-                if(mic) mic.classList.add('listening');
-                recognition.start();
-            } catch (err) {
-                console.log("Recognition already started or failed");
-            }
+            startRecognitionSafely();
         };
         
         window.speechSynthesis.speak(wordAudio);
@@ -366,12 +307,14 @@
     // D. 成功后的高能量反馈
     function handleSuccess() {
         stars++;
-        renderFeedback(getRandomPraise());
+        
+        // [修复 Bug 1] 随机获取一致的表扬文字和声音对象
+        const praiseObj = PRAISES[Math.floor(Math.random() * PRAISES.length)];
+        
+        renderFeedback(praiseObj.text);
         playDing();
 
-        const praises = ["Perfect!", "Amazing!", "You're a superstar!", "Excellent!"];
-        const praiseText = praises[Math.floor(Math.random() * praises.length)];
-        const praiseAudio = highEnergySpeak(praiseText, true);
+        const praiseAudio = highEnergySpeak(praiseObj.speech, true);
         
         praiseAudio.onend = () => {
             if (curPhase === 1) {
@@ -417,6 +360,7 @@
 
         if (curPhase === 1) {
             stars = 0;
+            // [修复 Bug 2] 添加 onclick 和 ontouchstart 实现移动端手动唤起
             view.innerHTML = `
                 <div class="word-card">
                     <div class="syllables">${wordObj.syllables}</div>
@@ -426,8 +370,8 @@
                 <div class="stars-row" id="star-row">
                     <span class="star">★</span><span class="star">★</span><span class="star">★</span>
                 </div>
-                <div class="mic-icon" id="mic-box">🎤</div>
-                <p style="color:#CCC; font-size:14px;">APP读完后，请你跟着读</p>
+                <div class="mic-icon" id="mic-box" style="cursor:pointer;" onclick="manualStartMic(event)" ontouchstart="manualStartMic(event)">🎤</div>
+                <p style="color:#CCC; font-size:14px; text-align:center;">APP读完后请跟读<br/>(如果没听清，可点击麦克风重试)</p>
             `;
             startStepLoop();
         } 
@@ -439,7 +383,7 @@
             `;
             renderChoices(wordObj);
             repeatWord();
-        }
+        } 
         else if (curPhase === 3) {
             view.innerHTML = `
                 <div class="mic-icon" style="background:var(--accent); cursor:pointer" onclick="repeatWord()">🔊</div>
@@ -512,10 +456,6 @@
         p.innerText = txt;
         p.classList.add('animate');
         setTimeout(() => p.classList.remove('animate'), 800);
-    }
-
-    function getRandomPraise() {
-        return ["AWESOME!", "PERFECT!", "COOL!", "WOW!"][Math.floor(Math.random()*4)];
     }
 
     function playDing() {
