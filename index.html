@@ -181,18 +181,12 @@
     let isTransitioning = false;
     let lastMicTap = 0;
 
-    // 检测是否为 iOS 设备 (严格模式)
-    function isIOS() {
-        return /iPad|iPhone|iPod/.test(navigator.userAgent) || 
-               (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
-    }
-
-    // --- 【修复一/二】极其严密的细颗粒度会话状态持久化 ---
+    // --- 极其严密的会话状态持久化 (为了防意外崩溃，我们依然保留存盘好习惯) ---
     function saveSession() {
         localStorage.setItem('app_session_day', currentDay);
         localStorage.setItem('app_session_curIdx', curIdx);
         localStorage.setItem('app_session_curPhase', curPhase);
-        localStorage.setItem('app_session_stars', stars); // 必须保存星星数量
+        localStorage.setItem('app_session_stars', stars); 
     }
 
     function clearSession() {
@@ -251,12 +245,12 @@
 
     function devNextDay() {
         localStorage.setItem('app_currentDay', currentDay + 1);
-        clearSession(); // 强行进入下一天时，清理会话状态
+        clearSession(); 
         location.reload();
     }
 
     /* =========================================
-       2. iOS 专属：音频生命周期与错误静默机制
+       2. iOS 专属：静音清场 + 暴力超度 + 300ms延迟重启
        ========================================= */
     function bootApp() {
         if (!SpeechConstructor) {
@@ -265,7 +259,6 @@
         }
 
         window.speechSynthesis.speak(new SpeechSynthesisUtterance(''));
-
         document.getElementById('start-screen').style.display = 'none';
         
         generateDailyTasks();
@@ -277,29 +270,30 @@
         render();
     }
 
+    // 终极护盾：1.静音清场  2.暴力超度
     function cleanupSpeech() {
         try { window.speechSynthesis.cancel(); } catch(e) {}
         
         if (currentRecognition) {
-            try { currentRecognition.abort(); } catch(e) { console.warn(e); }
+            try { currentRecognition.abort(); } catch(e) {}
             currentRecognition = null;
         }
         isRecognizing = false;
         resetMicUI();
     }
 
+    // 【完美单页延迟重建法】
     function startFreshRecognition() {
         if (!SpeechConstructor || curPhase !== 1 || isTransitioning) return;
 
-        if (currentRecognition) {
-            try { currentRecognition.abort(); } catch (e) { }
-            currentRecognition = null;
-        }
-        resetMicUI();
+        // 步骤 1 & 2：静音清场 + 彻底摧毁旧实例
+        cleanupSpeech();
 
+        // 步骤 3：给系统底层喘息时间，核心救命 300ms！
         setTimeout(() => {
             if (curPhase !== 1 || isTransitioning) return;
 
+            // 再次双重确保超度干净
             if (currentRecognition) {
                 try { currentRecognition.abort(); } catch (e) { }
                 currentRecognition = null;
@@ -308,6 +302,7 @@
             let recognition = new SpeechConstructor();
             currentRecognition = recognition;
 
+            // 步骤 4：强制单次识别
             recognition.continuous = false;
             recognition.lang = 'en-US';
             recognition.interimResults = false;
@@ -334,28 +329,28 @@
                 isRecognizing = false; 
                 resetMicUI();
 
-                // 【修复三】绝不弹窗打扰！默默销毁！
-                try { recognition.stop(); } catch(err) {}
+                // 彻底干掉报错弹窗，使用 abort 默默释放内存
+                try { recognition.abort(); } catch(err) {}
                 if (currentRecognition === recognition) currentRecognition = null;
-                recognition = null;
 
                 if (e.error === 'not-allowed') {
                     showModal("麦克风已准备好", "请再按一次麦克风开始录音！🎤\n(若始终不行，请在设置中允许权限)", "🎤");
                 } else if (e.error === 'network') {
                     showModal("网络有点不稳定", "语音评分需要连接网络，请查网后重试~", "🌐");
                 } else if (e.error === 'no-speech' && curPhase === 1 && !isTransitioning) {
-                    setTimeout(startStepLoop, 200);
+                    // 没有听到声音，给予系统 300ms 缓冲后安全自动重试
+                    setTimeout(startStepLoop, 300);
                 }
-                // aborted 直接静默，啥也不干，不会打断用户进程
+                // aborted 等异常静默处理，保证 UI 是可恢复重点击状态
             };
 
             recognition.onend = () => { 
                 isRecognizing = false; 
                 resetMicUI(); 
-
-                try { recognition.stop(); } catch(err) {}
+                
+                // 彻底释放
+                try { recognition.abort(); } catch(err) {}
                 if (currentRecognition === recognition) currentRecognition = null;
-                recognition = null;
             };
 
             try {
@@ -365,10 +360,9 @@
                 isRecognizing = false; 
                 resetMicUI();
                 currentRecognition = null;
-                recognition = null;
             }
 
-        }, 200); 
+        }, 300); 
     }
 
     function manualStartMic(e) {
@@ -377,15 +371,17 @@
         if (now - lastMicTap < 800) return;
         lastMicTap = now;
 
-        cleanupSpeech(); 
+        // 点击时会直接调用 startFreshRecognition，里面已经包含了 cancel、abort 和 300ms 的延迟！
         startFreshRecognition(); 
     }
 
     /* =========================================
-       3. 核心互动与渲染逻辑
+       3. 核心互动与渲染逻辑 (彻底废弃 Reload)
        ========================================= */
     function startStepLoop() {
         if (curPhase !== 1 || isTransitioning) return;
+        
+        // 确保读音前清场
         cleanupSpeech();
 
         const wordAudio = highEnergySpeak(todayWords[curIdx].word);
@@ -405,6 +401,8 @@
         isTransitioning = true;
         
         stars++; // 每成功一次，星星直接 +1
+        
+        // 立刻闭麦清场，绝不允许边播表扬边开麦
         cleanupSpeech(); 
         
         const praiseObj = PRAISES[Math.floor(Math.random() * PRAISES.length)];
@@ -421,23 +419,14 @@
             if (curPhase === 1) {
                 if (stars < todayWords[curIdx].requiredStars) {
                     updateStars(); 
-                    
-                    // 【修复一】只要没读完，每读成功1次就存进度 + iOS秒刷新
                     saveSession(); 
-                    if (isIOS()) {
-                        window.location.reload();
-                    } else {
-                        setTimeout(startStepLoop, 400);
-                    }
+                    // [彻底废除 Reload，使用 SPA 无缝延迟进入下一拍]
+                    setTimeout(startStepLoop, 400);
                 } else {
                     curPhase = 2;
-                    saveSession(); // 存状态到环节2
-                    
-                    if (isIOS()) {
-                        window.location.reload();
-                    } else {
-                        render();
-                    }
+                    saveSession(); 
+                    // [彻底废除 Reload，直接无刷新渲染下一环节]
+                    render();
                 }
             } else if (curPhase === 2) {
                 curPhase = 3; 
@@ -447,7 +436,7 @@
                 saveWordProgress(todayWords[curIdx].word);
                 curIdx++; 
                 curPhase = 1;
-                stars = 0; // 下一个新单词开始时，星星归零
+                stars = 0; 
                 saveSession(); 
                 
                 if (curIdx >= todayWords.length) {
@@ -476,7 +465,6 @@
         document.getElementById('progress-info').innerText = `第 ${currentDay} 天 | ${curIdx + 1} / ${todayWords.length} 词`;
 
         if (curPhase === 1) {
-            // 【重点】这里不要盲目重置 stars=0 了，避免覆盖持久化恢复的数据
             let reqStars = wordObj.requiredStars;
             let starsHTML = '';
             for(let i=0; i<reqStars; i++) starsHTML += `<span class="star">★</span>`;
@@ -495,7 +483,7 @@
                 <p style="color:#CCC; font-size:14px; text-align:center;">APP读完后请跟读<br/>(没听清可点击麦克风重试)</p>
             `;
             
-            // 【修复二】刚渲染完 HTML，立刻把被中断/刚刷新的星星数恢复高亮！
+            // 恢复之前因为断网或刷新残留的星星数
             updateStars();
             startStepLoop();
         } 
@@ -617,7 +605,7 @@
         `;
     }
 
-    // --- 【修复二】极致无缝：页面初始化与恢复挂载 ---
+    // --- 页面初始化与挂载 ---
     function restoreSession() {
         const savedDay = localStorage.getItem('app_session_day');
         if (savedDay && parseInt(savedDay) === currentDay) {
@@ -628,9 +616,8 @@
             if (savedPhase !== null && savedIdx !== null) {
                 curIdx = parseInt(savedIdx);
                 curPhase = parseInt(savedPhase);
-                stars = savedStars ? parseInt(savedStars) : 0; // 读取并赋值星星数量
+                stars = savedStars ? parseInt(savedStars) : 0; 
                 
-                // 瞬间抹去主屏幕！接管世界！
                 document.getElementById('start-screen').style.display = 'none';
                 generateDailyTasks();
                 
@@ -638,7 +625,7 @@
                     clearSession();
                     showWin("太棒了！<br>你已学完全部单词，且今日打卡任务已清空！🎉");
                 } else {
-                    render(); // 这里渲染的时候，Phase 1 会读取我们上面的星星变量并点亮！
+                    render(); 
                 }
                 return true;
             }
@@ -646,7 +633,6 @@
         return false;
     }
 
-    // 引擎挂载：劫持初始化流程
     restoreSession();
 
 </script>
