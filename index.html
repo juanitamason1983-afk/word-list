@@ -2,7 +2,11 @@
 <html lang="zh-CN">
 <head>
     <meta charset="UTF-8">
+    <!-- PWA 沉浸式全屏 Meta 标签 -->
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    
     <title>Magic English - 单词森林大冒险</title>
     <style>
         /* 视觉系统 (保持高能量马卡龙风) */
@@ -172,7 +176,7 @@
 
     // --- iOS 麦克风核心状态管理 ---
     const SpeechConstructor = window.SpeechRecognition || window.webkitSpeechRecognition;
-    let currentRecognition = null; // 【关键法则】用于追踪全局唯一实例并执行刺杀
+    let currentRecognition = null; // 用于追踪全局唯一实例并执行刺杀
     let isRecognizing = false;
     let isTransitioning = false;
     let lastMicTap = 0;
@@ -187,8 +191,6 @@
             let progress = userProgress[wordStr];
             if (progress.firstLearnedDay < currentDay) {
                 learnedBeforeTodayCount++;
-                
-                // 过去7天的复习拦截
                 let age = currentDay - progress.firstLearnedDay;
                 if (age > 0 && age <= 7) {
                     if (progress.lastReviewDay !== currentDay) {
@@ -202,7 +204,6 @@
             }
         }
         
-        // 新词拦截：严格往后取 10 个今天没学过的新词
         for (let i = learnedBeforeTodayCount; i < learnedBeforeTodayCount + 10; i++) {
             if (ALL_WORDS[i]) {
                 let w = ALL_WORDS[i].word;
@@ -215,7 +216,6 @@
         todayWords =[...reviewQueue, ...newQueue];
     }
 
-    // 保存进度
     function saveWordProgress(wordStr) {
         if (!userProgress[wordStr]) {
             userProgress[wordStr] = { firstLearnedDay: currentDay, reviews: 0, lastReviewDay: currentDay };
@@ -228,14 +228,13 @@
         localStorage.setItem('app_userProgress', JSON.stringify(userProgress));
     }
 
-    // 开发者模式：时光穿梭
     function devNextDay() {
         localStorage.setItem('app_currentDay', currentDay + 1);
         location.reload();
     }
 
     /* =========================================
-       2. iOS 专属：全新重构的生命周期管理
+       2. iOS 专属：极度暴力的音频生命周期重构
        ========================================= */
     function bootApp() {
         if (!SpeechConstructor) {
@@ -243,12 +242,10 @@
             return;
         }
 
-        // 激活 iOS / Safari 音频自动播放策略
         window.speechSynthesis.speak(new SpeechSynthesisUtterance(''));
 
         document.getElementById('start-screen').style.display = 'none';
         
-        // 移除旧版会导致实例复用卡死的 initRecognition 调用
         generateDailyTasks();
 
         if (todayWords.length === 0) {
@@ -258,11 +255,11 @@
         render();
     }
 
-    // 终极护盾：清理一切正在进行的读与听，绝对防止报错与死锁
+    // 终极护盾：随时清理旧环境
     function cleanupSpeech() {
         try { window.speechSynthesis.cancel(); } catch(e) {}
         
-        // 【关键法则 4】暴力清理残留
+        // 如果有残留实例，无情斩杀并置空
         if (currentRecognition) {
             try { currentRecognition.abort(); } catch(e) { console.warn(e); }
             currentRecognition = null;
@@ -271,81 +268,108 @@
         resetMicUI();
     }
 
-    // 【关键重构点】每次录音必须执行这个函数，内部全新实例化
+    // 【极度暴力重建函数】
     function startFreshRecognition() {
         if (!SpeechConstructor || curPhase !== 1 || isTransitioning) return;
 
-        // 在 new 之前，确保旧的尸骨无存
+        // 第一道斩击：斩杀所有可能的旧残留
         if (currentRecognition) {
             try { currentRecognition.abort(); } catch (e) { }
             currentRecognition = null;
         }
         resetMicUI();
 
-        // 【关键法则 2】每次点击全新实例化，绝不复用
-        const recognition = new SpeechConstructor();
-
-        // 【关键法则 3】关闭连续识别，符合移动端最佳实践
-        recognition.continuous = false;
-        recognition.lang = 'en-US';
-        recognition.interimResults = false;
-        recognition.maxAlternatives = 1;
-
-        // 【关键法则 5】事件必须绑给刚刚 new 出来的局部实例
-        recognition.onstart = () => { 
-            isRecognizing = true; 
-            document.getElementById('mic-box')?.classList.add('listening'); 
-        };
-        
-        recognition.onresult = (e) => {
+        // 强制延迟 200ms：让 iOS 底层彻底释放麦克风资源
+        setTimeout(() => {
             if (curPhase !== 1 || isTransitioning) return;
-            const result = e.results[0][0].transcript.toLowerCase();
-            const target = todayWords[curIdx].word.toLowerCase();
-            if (result.includes(target) || target.includes(result)) {
-                handleSuccess();
-            } else {
-                renderFeedback("Try again!");
-                setTimeout(startStepLoop, 1200);
+
+            // 延迟结束后，第二道斩击，确保绝对纯净
+            if (currentRecognition) {
+                try { currentRecognition.abort(); } catch (e) { }
+                currentRecognition = null;
             }
-        };
 
-        recognition.onerror = (e) => {
-            isRecognizing = false; resetMicUI();
-            console.warn('Speech Error:', e.error);
-            if (e.error === 'not-allowed') {
-                showModal("麦克风已准备好", "请再按一次麦克风开始录音！🎤\n(若始终不行，请在设置中允许权限)", "🎤");
-            } else if (e.error === 'network') {
-                showModal("网络有点不稳定", "语音评分需要连接网络，请查网后重试~", "🌐");
-            } else if (e.error === 'no-speech' && curPhase === 1 && !isTransitioning) {
-                startStepLoop();
+            // 临时作用域中的全新实例
+            let recognition = new SpeechConstructor();
+            currentRecognition = recognition;
+
+            recognition.continuous = false;
+            recognition.lang = 'en-US';
+            recognition.interimResults = false;
+            recognition.maxAlternatives = 1;
+
+            recognition.onstart = () => { 
+                isRecognizing = true; 
+                document.getElementById('mic-box')?.classList.add('listening'); 
+            };
+            
+            recognition.onresult = (e) => {
+                if (curPhase !== 1 || isTransitioning) return;
+                const result = e.results[0][0].transcript.toLowerCase();
+                const target = todayWords[curIdx].word.toLowerCase();
+                if (result.includes(target) || target.includes(result)) {
+                    handleSuccess();
+                } else {
+                    renderFeedback("Try again!");
+                    setTimeout(startStepLoop, 1200);
+                }
+            };
+
+            recognition.onerror = (e) => {
+                isRecognizing = false; 
+                resetMicUI();
+
+                // 【精准报错弹窗】：方便调试 iOS 的具体死锁类型
+                alert("语音识别报错代码: " + e.error);
+
+                // 错误时彻底释放对象内存
+                try { recognition.stop(); } catch(err) {}
+                if (currentRecognition === recognition) currentRecognition = null;
+                recognition = null;
+
+                if (e.error === 'not-allowed') {
+                    showModal("麦克风已准备好", "请再按一次麦克风开始录音！🎤\n(若始终不行，请在设置中允许权限)", "🎤");
+                } else if (e.error === 'network') {
+                    showModal("网络有点不稳定", "语音评分需要连接网络，请查网后重试~", "🌐");
+                } else if (e.error === 'no-speech' && curPhase === 1 && !isTransitioning) {
+                    // 同样给予 200ms 的释放时间再进行循环
+                    setTimeout(startStepLoop, 200);
+                }
+            };
+
+            recognition.onend = () => { 
+                isRecognizing = false; 
+                resetMicUI(); 
+
+                // 结束时彻底释放对象内存
+                try { recognition.stop(); } catch(err) {}
+                if (currentRecognition === recognition) currentRecognition = null;
+                recognition = null;
+            };
+
+            // 启动引擎
+            try {
+                recognition.start();
+            } catch (err) {
+                console.warn("Recognition start failed:", err);
+                isRecognizing = false; 
+                resetMicUI();
+                currentRecognition = null;
+                recognition = null;
             }
-        };
 
-        recognition.onend = () => { 
-            isRecognizing = false; 
-            resetMicUI(); 
-        };
-
-        // 启动并赋予全局引用供打断使用
-        try {
-            recognition.start();
-            currentRecognition = recognition; 
-        } catch (err) {
-            console.warn("Recognition start failed:", err);
-            isRecognizing = false; resetMicUI();
-        }
+        }, 200); // 必须等待的 200 毫秒
     }
 
-    // 手动点击麦克风时调用（支持触屏）
     function manualStartMic(e) {
-        if (e && e.cancelable) e.preventDefault(); // 防双重触发
+        if (e && e.cancelable) e.preventDefault();
         const now = Date.now();
-        if (now - lastMicTap < 800) return; // 防连击打断
+        if (now - lastMicTap < 800) return;
         lastMicTap = now;
 
         cleanupSpeech(); 
-        // 延时让出线程，等浏览器销毁底层录音线程
-        setTimeout(startFreshRecognition, 150); 
+        // 触发极度暴力重建流程，自带 200ms 安全冷却期
+        startFreshRecognition(); 
     }
 
     /* =========================================
@@ -360,11 +384,10 @@
         
         wordAudio.onend = () => {
             if(audioFired) return; audioFired = true;
-            // 语音播报结束，自动执行全新实例化开始听音
-            setTimeout(() => { if (curPhase === 1 && !isTransitioning) startFreshRecognition(); }, 150);
+            // 语音结束后触发，内置 200ms 重建冷却
+            if (curPhase === 1 && !isTransitioning) startFreshRecognition();
         };
         
-        // iOS 引擎卡死保险措施
         setTimeout(() => { if (!audioFired) wordAudio.onend(); }, 2500);
         window.speechSynthesis.speak(wordAudio);
     }
@@ -374,7 +397,7 @@
         isTransitioning = true;
         
         stars++;
-        cleanupSpeech(); // 成功后立刻强杀所有旧事件，准备渲染或播放表扬
+        cleanupSpeech(); 
         
         const praiseObj = PRAISES[Math.floor(Math.random() * PRAISES.length)];
         renderFeedback(praiseObj.text);
@@ -396,7 +419,6 @@
             } else if (curPhase === 2) {
                 curPhase = 3; render();
             } else {
-                // 当前单词已彻底通关
                 saveWordProgress(todayWords[curIdx].word);
                 curIdx++; curPhase = 1;
                 if (curIdx >= todayWords.length) {
@@ -408,13 +430,13 @@
         };
 
         praiseAudio.onend = nextStep;
-        setTimeout(nextStep, 2500); // 保险机制
+        setTimeout(nextStep, 2500);
         window.speechSynthesis.speak(praiseAudio);
     }
 
     function render() {
         isTransitioning = false; 
-        cleanupSpeech(); // 严谨清理旧环境
+        cleanupSpeech(); 
 
         const view = document.getElementById('game-view');
         const wordObj = todayWords[curIdx];
@@ -488,9 +510,9 @@
     function renderChoices(correct) {
         let choices = [correct];
         let available = ALL_WORDS.filter(x => x.word !== correct.word);
-        available.sort(() => Math.random() - 0.5); // 随机打乱备用词
+        available.sort(() => Math.random() - 0.5); 
         choices.push(...available.slice(0, 3));
-        choices.sort(() => Math.random() - 0.5); // 混淆四个选项
+        choices.sort(() => Math.random() - 0.5); 
         
         const box = document.getElementById('opt-box');
         choices.forEach(c => {
@@ -511,7 +533,7 @@
         const input = document.getElementById('speller');
         const val = input.value.toLowerCase().trim();
         if(val === todayWords[curIdx].word.toLowerCase()) {
-            input.blur(); handleSuccess(); // 成功时收起键盘
+            input.blur(); handleSuccess(); 
         } else {
             input.style.borderColor = 'red'; repeatWord();
         }
