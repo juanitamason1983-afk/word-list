@@ -170,9 +170,11 @@
     let curPhase = 1;
     let stars = 0;
 
-    let recognition = null;
+    // --- iOS 麦克风核心状态管理 ---
+    const SpeechConstructor = window.SpeechRecognition || window.webkitSpeechRecognition;
+    let currentRecognition = null; // 【关键法则】用于追踪全局唯一实例并执行刺杀
     let isRecognizing = false;
-    let isTransitioning = false; // 防死锁的全局护盾
+    let isTransitioning = false;
     let lastMicTap = 0;
 
     // 核心：每日任务分发器
@@ -189,11 +191,9 @@
                 // 过去7天的复习拦截
                 let age = currentDay - progress.firstLearnedDay;
                 if (age > 0 && age <= 7) {
-                    // 如果今天还没复习过，才拉入队列（支持刷新记忆）
                     if (progress.lastReviewDay !== currentDay) {
                         let baseWord = ALL_WORDS.find(w => w.word === wordStr);
                         if (baseWord) {
-                            // 动态难度：1~3天重度(3星)，4~7天轻度(1星)
                             let reqStars = (age <= 3) ? 3 : 1;
                             reviewQueue.push({ ...baseWord, requiredStars: reqStars, isNew: false });
                         }
@@ -235,11 +235,10 @@
     }
 
     /* =========================================
-       2. 生命周期与防白屏崩溃处理
+       2. iOS 专属：全新重构的生命周期管理
        ========================================= */
     function bootApp() {
-        const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-        if (!SpeechRecognition) {
+        if (!SpeechConstructor) {
             showModal("当前浏览器不支持录音", "建议使用 Chrome、Safari 或系统自带浏览器打开哦！", "❌");
             return;
         }
@@ -249,7 +248,7 @@
 
         document.getElementById('start-screen').style.display = 'none';
         
-        initRecognition(SpeechRecognition);
+        // 移除旧版会导致实例复用卡死的 initRecognition 调用
         generateDailyTasks();
 
         if (todayWords.length === 0) {
@@ -259,13 +258,44 @@
         render();
     }
 
-    function initRecognition(SpeechConstructor) {
-        recognition = new SpeechConstructor();
+    // 终极护盾：清理一切正在进行的读与听，绝对防止报错与死锁
+    function cleanupSpeech() {
+        try { window.speechSynthesis.cancel(); } catch(e) {}
+        
+        // 【关键法则 4】暴力清理残留
+        if (currentRecognition) {
+            try { currentRecognition.abort(); } catch(e) { console.warn(e); }
+            currentRecognition = null;
+        }
+        isRecognizing = false;
+        resetMicUI();
+    }
+
+    // 【关键重构点】每次录音必须执行这个函数，内部全新实例化
+    function startFreshRecognition() {
+        if (!SpeechConstructor || curPhase !== 1 || isTransitioning) return;
+
+        // 在 new 之前，确保旧的尸骨无存
+        if (currentRecognition) {
+            try { currentRecognition.abort(); } catch (e) { }
+            currentRecognition = null;
+        }
+        resetMicUI();
+
+        // 【关键法则 2】每次点击全新实例化，绝不复用
+        const recognition = new SpeechConstructor();
+
+        // 【关键法则 3】关闭连续识别，符合移动端最佳实践
+        recognition.continuous = false;
         recognition.lang = 'en-US';
         recognition.interimResults = false;
         recognition.maxAlternatives = 1;
 
-        recognition.onstart = () => { isRecognizing = true; document.getElementById('mic-box')?.classList.add('listening'); };
+        // 【关键法则 5】事件必须绑给刚刚 new 出来的局部实例
+        recognition.onstart = () => { 
+            isRecognizing = true; 
+            document.getElementById('mic-box')?.classList.add('listening'); 
+        };
         
         recognition.onresult = (e) => {
             if (curPhase !== 1 || isTransitioning) return;
@@ -281,6 +311,7 @@
 
         recognition.onerror = (e) => {
             isRecognizing = false; resetMicUI();
+            console.warn('Speech Error:', e.error);
             if (e.error === 'not-allowed') {
                 showModal("麦克风已准备好", "请再按一次麦克风开始录音！🎤\n(若始终不行，请在设置中允许权限)", "🎤");
             } else if (e.error === 'network') {
@@ -290,37 +321,31 @@
             }
         };
 
-        recognition.onend = () => { isRecognizing = false; resetMicUI(); };
-    }
+        recognition.onend = () => { 
+            isRecognizing = false; 
+            resetMicUI(); 
+        };
 
-    // 终极护盾：清理一切正在进行的读与听，绝对防止报错与死锁
-    function cleanupSpeech() {
-        try { window.speechSynthesis.cancel(); } catch(e) {}
-        if (recognition && isRecognizing) {
-            try { recognition.abort(); } catch(e) { console.warn(e); }
-        }
-        isRecognizing = false;
-        resetMicUI();
-    }
-
-    function startRecognitionSafely() {
-        if (!recognition || curPhase !== 1 || isTransitioning || isRecognizing) return;
+        // 启动并赋予全局引用供打断使用
         try {
             recognition.start();
+            currentRecognition = recognition; 
         } catch (err) {
-            console.warn("Recognition start skipped safely:", err);
+            console.warn("Recognition start failed:", err);
             isRecognizing = false; resetMicUI();
         }
     }
 
+    // 手动点击麦克风时调用（支持触屏）
     function manualStartMic(e) {
-        if (e && e.cancelable) e.preventDefault();
+        if (e && e.cancelable) e.preventDefault(); // 防双重触发
         const now = Date.now();
         if (now - lastMicTap < 800) return; // 防连击打断
         lastMicTap = now;
 
         cleanupSpeech(); 
-        setTimeout(startRecognitionSafely, 150); // 留出底层硬件释放缓冲
+        // 延时让出线程，等浏览器销毁底层录音线程
+        setTimeout(startFreshRecognition, 150); 
     }
 
     /* =========================================
@@ -335,7 +360,8 @@
         
         wordAudio.onend = () => {
             if(audioFired) return; audioFired = true;
-            setTimeout(() => { if (curPhase === 1 && !isTransitioning) startRecognitionSafely(); }, 150);
+            // 语音播报结束，自动执行全新实例化开始听音
+            setTimeout(() => { if (curPhase === 1 && !isTransitioning) startFreshRecognition(); }, 150);
         };
         
         // iOS 引擎卡死保险措施
