@@ -5,18 +5,10 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Magic English - 单词森林大冒险</title>
     <style>
-        /* 
-            =========================================
-           1. 游戏化视觉系统 (保持高能量马卡龙风)
-           =========================================
-        */
+        /* 视觉系统 (保持高能量马卡龙风) */
         :root {
-            --bg: #FFF9F2;
-            --primary: #FF6B6B; 
-            --secondary: #4ECDC4; 
-            --accent: #FFE66D; 
-            --white: #FFFFFF;
-            --text: #2D3436;
+            --bg: #FFF9F2; --primary: #FF6B6B; --secondary: #4ECDC4; 
+            --accent: #FFE66D; --white: #FFFFFF; --text: #2D3436;
         }
 
         body {
@@ -31,27 +23,24 @@
             background: var(--white); position: relative; display: flex; flex-direction: column; overflow: hidden;
         }
 
-        /* 顶部进度 */
         .header { padding: 40px 30px 10px; }
         .progress-box { width: 100%; height: 16px; background: #F0F0F0; border-radius: 10px; overflow: hidden; }
         .progress-bar { width: 0%; height: 100%; background: linear-gradient(90deg, var(--secondary), var(--primary)); transition: 0.6s; }
         
-        /* 游戏主体 */
         .game-area { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 20px; }
-        .word-card { text-align: center; }
+        .word-card { text-align: center; margin-bottom: 10px; }
         .syllables { font-size: 24px; color: var(--secondary); font-weight: bold; }
         .word-main { font-size: 56px; color: var(--primary); margin: 5px 0; }
         .meaning { font-size: 26px; color: #A0A0A0; }
 
-        /* 星星与反馈 */
-        .stars-row { display: flex; gap: 15px; margin: 25px 0; }
+        .stars-row { display: flex; gap: 15px; margin: 15px 0 25px 0; min-height: 50px;}
         .star { font-size: 45px; color: #EEE; transition: 0.3s; }
         .star.active { color: var(--accent); transform: scale(1.2) rotate(10deg); text-shadow: 0 0 15px var(--accent); }
 
         .mic-icon {
             width: 100px; height: 100px; border-radius: 50%;
             background: #F8F9FA; display: flex; align-items: center; justify-content: center;
-            font-size: 45px; transition: 0.3s; margin-bottom: 10px;
+            font-size: 45px; transition: 0.3s; margin-bottom: 10px; user-select: none;
         }
         .mic-icon.listening {
             background: var(--secondary); color: white;
@@ -59,55 +48,51 @@
         }
         @keyframes pulse { 0% { transform: scale(1); } 50% { transform: scale(1.1); } 100% { transform: scale(1); } }
 
-        /* 高能量文本弹窗 */
         #praise-popup {
             position: absolute; top: 40%; left: 50%; transform: translate(-50%, -50%) scale(0);
             font-size: 60px; font-weight: 900; color: var(--accent); z-index: 100;
-            text-shadow: 3px 3px 0 var(--primary); pointer-events: none; transition: 0.4s;
+            text-shadow: 3px 3px 0 var(--primary); pointer-events: none; transition: 0.4s; text-align: center;
         }
         #praise-popup.animate { transform: translate(-50%, -50%) scale(1.2); }
 
-        /* 选项按钮 */
         .opt-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; width: 100%; }
         .opt-btn {
             background: #FFF; border: 3px solid #F0F0F0; padding: 18px;
-            border-radius: 20px; font-size: 20px; cursor: pointer; text-align: center;
+            border-radius: 20px; font-size: 20px; cursor: pointer; text-align: center; transition: 0.2s;
         }
         .opt-btn.correct { background: var(--secondary); color: white; border-color: var(--secondary); }
 
-        /* 兼容性/提示弹窗 (重要) */
         .modal {
-            position: fixed; inset: 0; background: rgba(0,0,0,0.85);
-            display: none; flex-direction: column; align-items: center; justify-content: center;
-            color: white; z-index: 2000; text-align: center; padding: 30px;
+            position: fixed; inset: 0; background: rgba(0,0,0,0.85); display: none; 
+            flex-direction: column; align-items: center; justify-content: center; z-index: 2000; text-align: center; padding: 30px;
         }
-        .modal-card {
-            background: var(--white); color: var(--text); padding: 30px;
-            border-radius: 30px; width: 85%; max-width: 350px;
-        }
+        .modal-card { background: var(--white); color: var(--text); padding: 30px; border-radius: 30px; width: 85%; max-width: 350px; }
         .modal-btn {
             background: var(--primary); color: white; border: none; padding: 12px 30px;
             border-radius: 50px; font-size: 18px; margin-top: 20px; cursor: pointer;
         }
 
-        /* 拼写输入 */
         .spell-input {
             width: 80%; border: none; border-bottom: 5px solid var(--secondary);
-            font-size: 40px; text-align: center; outline: none; margin-bottom: 25px;
-            font-family: inherit;
+            font-size: 40px; text-align: center; outline: none; margin-bottom: 25px; font-family: inherit;
         }
 
         .overlay {
-            position: fixed; inset: 0; background: var(--primary);
-            display: flex; flex-direction: column; align-items: center; justify-content: center;
-            color: white; z-index: 1500;
+            position: fixed; inset: 0; background: var(--primary); display: flex; 
+            flex-direction: column; align-items: center; justify-content: center; color: white; z-index: 1500;
+        }
+
+        /* 开发者模式按钮 */
+        .dev-btn {
+            position: fixed; bottom: 15px; right: 15px; background: rgba(0,0,0,0.1); color: #666;
+            border: none; padding: 8px 15px; border-radius: 8px; font-size: 12px; z-index: 9999; cursor: pointer;
         }
     </style>
 </head>
 <body>
 
 <div id="app">
-    <div class="header">
+    <div class="header" id="header-area">
         <div class="progress-box"><div class="progress-bar" id="bar"></div></div>
         <div style="text-align: right; margin-top: 8px; font-size: 14px; color: #CCC;" id="progress-info">0/0</div>
     </div>
@@ -120,11 +105,11 @@
     <div id="start-screen" class="overlay">
         <div style="font-size: 80px; margin-bottom: 20px;">🦖</div>
         <h1 style="font-size: 32px;">超级单词闯关</h1>
-        <p style="padding: 0 40px;">进入森林前，请点击按钮并<br><b>【允许麦克风权限】</b></p>
-        <button onclick="bootApp()" style="background:white; color:var(--primary); border:none; padding:18px 50px; border-radius:50px; font-size:24px; font-weight:bold; margin-top:30px;">开启冒险</button>
+        <p style="padding: 0 40px; text-align: center;">进入森林前，请点击按钮并<br><b>【允许麦克风权限】</b></p>
+        <button onclick="bootApp()" style="background:white; color:var(--primary); border:none; padding:18px 50px; border-radius:50px; font-size:24px; font-weight:bold; margin-top:30px; cursor: pointer;">开启冒险</button>
     </div>
 
-    <!-- 兼容性/提示弹窗 -->
+    <!-- 提示弹窗 -->
     <div id="msg-modal" class="modal">
         <div class="modal-card">
             <div id="modal-icon" style="font-size: 50px; margin-bottom: 10px;">⚠️</div>
@@ -135,95 +120,157 @@
     </div>
 </div>
 
+<button class="dev-btn" onclick="devNextDay()">测试：进入下一天 ⏭</button>
+
 <script>
-    /* 
-        =========================================
-       2. 核心逻辑与兼容性处理
-       =========================================
-    */
-
-    const WORDS =[
-      { word: "gray", syllables: "gray", meaning: "灰色的" },
-      { word: "duckling", syllables: "duck-ling", meaning: "小鸭子" },
-      { word: "different", syllables: "dif-fer-ent", meaning: "不同的" },
-      { word: "says", syllables: "says", meaning: "说" },
-      { word: "little", syllables: "lit-tle", meaning: "小的" },
-      { word: "another", syllables: "an-oth-er", meaning: "另外的" },
-      { word: "pond", syllables: "pond", meaning: "池塘" },
-      { word: "lovely", syllables: "love-ly", meaning: "可爱的" },
-      { word: "summer", syllables: "sum-mer", meaning: "夏天" },
-      { word: "farm", syllables: "farm", meaning: "农场" },
-      { word: "ugly", syllables: "ug-ly", meaning: "丑的" },
-      { word: "go away", syllables: "go a-way", meaning: "走开" },
-      { word: "animals", syllables: "an-i-mals", meaning: "动物" },
-      { word: "from the farm", syllables: "from the farm", meaning: "来自农场" },
-      { word: "who", syllables: "who", meaning: "谁" },
-      { word: "autumn", syllables: "au-tumn", meaning: "秋天" },
-      { word: "winter", syllables: "win-ter", meaning: "冬天" },
-      { word: "farmhouse", syllables: "farm-house", meaning: "农场房子" },
-      { word: "give", syllables: "give", meaning: "给" },
-      { word: "some", syllables: "some", meaning: "一些" },
-      { word: "play with", syllables: "play with", meaning: "和...一起玩" },
-      { word: "river", syllables: "riv-er", meaning: "河流" },
-      { word: "hide", syllables: "hide", meaning: "躲起来" },
-      { word: "spring", syllables: "spring", meaning: "春天" },
-      { word: "swan", syllables: "swan", meaning: "天鹅" },
-      { word: "where", syllables: "where", meaning: "哪里" },
-      { word: "isn't", syllables: "is-n't", meaning: "不是" }
+    /* =========================================
+       1. 数据与艾宾浩斯复习算法 (LocalStorage)
+       ========================================= */
+    const ALL_WORDS =[
+        { word: "gray", syllables: "gray", meaning: "灰色的" },
+        { word: "duckling", syllables: "duck-ling", meaning: "小鸭子" },
+        { word: "different", syllables: "dif-fer-ent", meaning: "不同的" },
+        { word: "says", syllables: "says", meaning: "说" },
+        { word: "little", syllables: "lit-tle", meaning: "小的" },
+        { word: "another", syllables: "an-oth-er", meaning: "另外的" },
+        { word: "pond", syllables: "pond", meaning: "池塘" },
+        { word: "lovely", syllables: "love-ly", meaning: "可爱的" },
+        { word: "summer", syllables: "sum-mer", meaning: "夏天" },
+        { word: "farm", syllables: "farm", meaning: "农场" },
+        { word: "ugly", syllables: "ug-ly", meaning: "丑的" },
+        { word: "go away", syllables: "go a-way", meaning: "走开" },
+        { word: "animals", syllables: "an-i-mals", meaning: "动物" },
+        { word: "from the farm", syllables: "from the farm", meaning: "来自农场" },
+        { word: "who", syllables: "who", meaning: "谁" },
+        { word: "autumn", syllables: "au-tumn", meaning: "秋天" },
+        { word: "winter", syllables: "win-ter", meaning: "冬天" },
+        { word: "farmhouse", syllables: "farm-house", meaning: "农场房子" },
+        { word: "give", syllables: "give", meaning: "给" },
+        { word: "some", syllables: "some", meaning: "一些" },
+        { word: "play with", syllables: "play with", meaning: "和...一起玩" },
+        { word: "river", syllables: "riv-er", meaning: "河流" },
+        { word: "hide", syllables: "hide", meaning: "躲起来" },
+        { word: "spring", syllables: "spring", meaning: "春天" },
+        { word: "swan", syllables: "swan", meaning: "天鹅" },
+        { word: "where", syllables: "where", meaning: "哪里" },
+        { word: "isn't", syllables: "is-n't", meaning: "不是" }
     ];
 
-    // [修复 Bug 1] 将表扬语和音频强绑定，确保音画一致
     const PRAISES =[
-        { text: "WOW!", speech: "Wow!" },
-        { text: "AMAZING!", speech: "Amazing!" },
-        { text: "PERFECT!", speech: "Perfect!" },
-        { text: "EXCELLENT!", speech: "Excellent!" },
-        { text: "AWESOME!", speech: "Awesome!" },
-        { text: "SUPERSTAR!", speech: "You're a superstar!" }
+        { text: "WOW!", speech: "Wow!" }, { text: "AMAZING!", speech: "Amazing!" },
+        { text: "PERFECT!", speech: "Perfect!" }, { text: "EXCELLENT!", speech: "Excellent!" },
+        { text: "AWESOME!", speech: "Awesome!" }, { text: "SUPERSTAR!", speech: "You're a superstar!" }
     ];
 
+    let currentDay = parseInt(localStorage.getItem('app_currentDay') || '1');
+    let userProgress = JSON.parse(localStorage.getItem('app_userProgress') || '{}');
+    
+    let todayWords =[];
     let curIdx = 0;
     let curPhase = 1;
-
     let stars = 0;
-    let recognition = null;
-    let isWechat = /MicroMessenger/i.test(navigator.userAgent);
-    let lastMicTap = 0; // 防抖时间戳
 
-    // A. 引导启动：检测 API 环境
+    let recognition = null;
+    let isRecognizing = false;
+    let isTransitioning = false; // 防死锁的全局护盾
+    let lastMicTap = 0;
+
+    // 核心：每日任务分发器
+    function generateDailyTasks() {
+        let newQueue = [];
+        let reviewQueue =[];
+        let learnedBeforeTodayCount = 0;
+
+        for (let wordStr in userProgress) {
+            let progress = userProgress[wordStr];
+            if (progress.firstLearnedDay < currentDay) {
+                learnedBeforeTodayCount++;
+                
+                // 过去7天的复习拦截
+                let age = currentDay - progress.firstLearnedDay;
+                if (age > 0 && age <= 7) {
+                    // 如果今天还没复习过，才拉入队列（支持刷新记忆）
+                    if (progress.lastReviewDay !== currentDay) {
+                        let baseWord = ALL_WORDS.find(w => w.word === wordStr);
+                        if (baseWord) {
+                            // 动态难度：1~3天重度(3星)，4~7天轻度(1星)
+                            let reqStars = (age <= 3) ? 3 : 1;
+                            reviewQueue.push({ ...baseWord, requiredStars: reqStars, isNew: false });
+                        }
+                    }
+                }
+            }
+        }
+        
+        // 新词拦截：严格往后取 10 个今天没学过的新词
+        for (let i = learnedBeforeTodayCount; i < learnedBeforeTodayCount + 10; i++) {
+            if (ALL_WORDS[i]) {
+                let w = ALL_WORDS[i].word;
+                if (!userProgress[w] || userProgress[w].firstLearnedDay !== currentDay) { 
+                    newQueue.push({ ...ALL_WORDS[i], requiredStars: 3, isNew: true });
+                }
+            }
+        }
+        
+        todayWords =[...reviewQueue, ...newQueue];
+    }
+
+    // 保存进度
+    function saveWordProgress(wordStr) {
+        if (!userProgress[wordStr]) {
+            userProgress[wordStr] = { firstLearnedDay: currentDay, reviews: 0, lastReviewDay: currentDay };
+        } else {
+            if (userProgress[wordStr].lastReviewDay !== currentDay) {
+                userProgress[wordStr].reviews += 1;
+                userProgress[wordStr].lastReviewDay = currentDay;
+            }
+        }
+        localStorage.setItem('app_userProgress', JSON.stringify(userProgress));
+    }
+
+    // 开发者模式：时光穿梭
+    function devNextDay() {
+        localStorage.setItem('app_currentDay', currentDay + 1);
+        location.reload();
+    }
+
+    /* =========================================
+       2. 生命周期与防白屏崩溃处理
+       ========================================= */
     function bootApp() {
         const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-
         if (!SpeechRecognition) {
-            if (isWechat) {
-                showModal("哎呀，微信内部暂不支持语音评分哦！", "请点击右上角三个点，选择【在浏览器/Safari中打开】获得完美体验~", "💡");
-            } else {
-                showModal("当前浏览器不支持录音", "建议使用 Chrome、Safari 或系统自带浏览器打开哦！", "❌");
-            }
+            showModal("当前浏览器不支持录音", "建议使用 Chrome、Safari 或系统自带浏览器打开哦！", "❌");
             return;
         }
 
+        // 激活 iOS / Safari 音频自动播放策略
+        window.speechSynthesis.speak(new SpeechSynthesisUtterance(''));
+
         document.getElementById('start-screen').style.display = 'none';
+        
         initRecognition(SpeechRecognition);
+        generateDailyTasks();
+
+        if (todayWords.length === 0) {
+            showWin("太棒了！<br>你已学完全部单词，且今日打卡任务已清空！🎉");
+            return;
+        }
         render();
     }
 
-    // B. 初始化识别引擎并处理错误捕获
     function initRecognition(SpeechConstructor) {
         recognition = new SpeechConstructor();
         recognition.lang = 'en-US';
         recognition.interimResults = false;
         recognition.maxAlternatives = 1;
 
-        //[修复 Bug 2] 使用 onstart 严谨处理 UI 状态变更
-        recognition.onstart = () => {
-            const mic = document.getElementById('mic-box');
-            if (mic) mic.classList.add('listening');
-        };
-
+        recognition.onstart = () => { isRecognizing = true; document.getElementById('mic-box')?.classList.add('listening'); };
+        
         recognition.onresult = (e) => {
+            if (curPhase !== 1 || isTransitioning) return;
             const result = e.results[0][0].transcript.toLowerCase();
-            const target = WORDS[curIdx].word.toLowerCase();
+            const target = todayWords[curIdx].word.toLowerCase();
             if (result.includes(target) || target.includes(result)) {
                 handleSuccess();
             } else {
@@ -233,145 +280,141 @@
         };
 
         recognition.onerror = (e) => {
-            console.error('Speech Error:', e.error);
-            resetMicUI(); // 清除界面动效
-            
-            // 严谨地结束识别，防止底层进程卡死
-            try { recognition.stop(); } catch(err){}
-
-            // [修复 Bug 2] 捕获权限打断，给出引导操作
-            if (e.error === 'not-allowed' || e.error === 'aborted') {
+            isRecognizing = false; resetMicUI();
+            if (e.error === 'not-allowed') {
                 showModal("麦克风已准备好", "请再按一次麦克风开始录音！🎤\n(若始终不行，请在设置中允许权限)", "🎤");
             } else if (e.error === 'network') {
-                showModal("网络有点不稳定", "语音评分需要连接网络，请检查网络后再试~", "🌐");
-            } else if (e.error === 'no-speech') {
-                // 没听到声音，可以再次循环或等待用户主动点击
+                showModal("网络有点不稳定", "语音评分需要连接网络，请查网后重试~", "🌐");
+            } else if (e.error === 'no-speech' && curPhase === 1 && !isTransitioning) {
                 startStepLoop();
             }
         };
 
-        recognition.onend = () => {
-            resetMicUI();
-            try { recognition.stop(); } catch(err){}
-        };
+        recognition.onend = () => { isRecognizing = false; resetMicUI(); };
     }
 
-    // [修复 Bug 2] 新增封装重置 UI 方法
-    function resetMicUI() {
-        const mic = document.getElementById('mic-box');
-        if (mic) mic.classList.remove('listening');
-    }
-
-    // [修复 Bug 2] 新增安全启动语音识别机制 (带有缓冲隔离，防止连续调用冲突)
-    function startRecognitionSafely() {
-        if (!recognition || curPhase !== 1) return;
-        
-        try { recognition.stop(); } catch(err) {}
+    // 终极护盾：清理一切正在进行的读与听，绝对防止报错与死锁
+    function cleanupSpeech() {
+        try { window.speechSynthesis.cancel(); } catch(e) {}
+        if (recognition && isRecognizing) {
+            try { recognition.abort(); } catch(e) { console.warn(e); }
+        }
+        isRecognizing = false;
         resetMicUI();
-
-        setTimeout(() => {
-            try {
-                if (curPhase === 1) recognition.start();
-            } catch (err) {
-                console.error("Recognition start failed:", err);
-            }
-        }, 150); // 150ms 缓冲，确保前一个状态彻底释放
     }
 
-    // [修复 Bug 2] 手动点击麦克风，支持多端触摸事件
-    function manualStartMic(e) {
-        if (e && e.cancelable) e.preventDefault(); // 阻止触摸双重触发
+    function startRecognitionSafely() {
+        if (!recognition || curPhase !== 1 || isTransitioning || isRecognizing) return;
+        try {
+            recognition.start();
+        } catch (err) {
+            console.warn("Recognition start skipped safely:", err);
+            isRecognizing = false; resetMicUI();
+        }
+    }
 
+    function manualStartMic(e) {
+        if (e && e.cancelable) e.preventDefault();
         const now = Date.now();
-        if (now - lastMicTap < 500) return; // 点击防抖
+        if (now - lastMicTap < 800) return; // 防连击打断
         lastMicTap = now;
 
-        window.speechSynthesis.cancel(); // 如果孩子按得早，取消当前机器的播报
-        startRecognitionSafely();
+        cleanupSpeech(); 
+        setTimeout(startRecognitionSafely, 150); // 留出底层硬件释放缓冲
     }
 
-    // C. 听-说 循环逻辑 (自动流)
+    /* =========================================
+       3. 核心互动与渲染逻辑
+       ========================================= */
     function startStepLoop() {
-        if (curPhase !== 1) return;
-        
-        // APP先读
-        const wordAudio = highEnergySpeak(WORDS[curIdx].word);
+        if (curPhase !== 1 || isTransitioning) return;
+        cleanupSpeech();
+
+        const wordAudio = highEnergySpeak(todayWords[curIdx].word);
+        let audioFired = false;
         
         wordAudio.onend = () => {
-            startRecognitionSafely();
+            if(audioFired) return; audioFired = true;
+            setTimeout(() => { if (curPhase === 1 && !isTransitioning) startRecognitionSafely(); }, 150);
         };
         
+        // iOS 引擎卡死保险措施
+        setTimeout(() => { if (!audioFired) wordAudio.onend(); }, 2500);
         window.speechSynthesis.speak(wordAudio);
     }
 
-    // D. 成功后的高能量反馈
     function handleSuccess() {
+        if (isTransitioning) return;
+        isTransitioning = true;
+        
         stars++;
+        cleanupSpeech(); // 成功后立刻强杀所有旧事件，准备渲染或播放表扬
         
-        // [修复 Bug 1] 随机获取一致的表扬文字和声音对象
         const praiseObj = PRAISES[Math.floor(Math.random() * PRAISES.length)];
-        
         renderFeedback(praiseObj.text);
         playDing();
 
         const praiseAudio = highEnergySpeak(praiseObj.speech, true);
+        let audioFired = false;
         
-        praiseAudio.onend = () => {
+        const nextStep = () => {
+            if(audioFired) return; audioFired = true;
+            isTransitioning = false;
+
             if (curPhase === 1) {
-                if (stars < 3) {
-                    updateStars();
-                    setTimeout(startStepLoop, 800);
+                if (stars < todayWords[curIdx].requiredStars) {
+                    updateStars(); setTimeout(startStepLoop, 400);
                 } else {
-                    curPhase = 2;
-                    setTimeout(render, 500);
+                    curPhase = 2; render();
                 }
             } else if (curPhase === 2) {
-                curPhase = 3;
-                render();
+                curPhase = 3; render();
             } else {
-                curIdx++;
-                curPhase = 1;
-                if (curIdx >= WORDS.length) showWin();
-                else render();
+                // 当前单词已彻底通关
+                saveWordProgress(todayWords[curIdx].word);
+                curIdx++; curPhase = 1;
+                if (curIdx >= todayWords.length) {
+                    showWin("太棒了！<br>你已完美完成今天的任务！🎉");
+                } else {
+                    render();
+                }
             }
         };
+
+        praiseAudio.onend = nextStep;
+        setTimeout(nextStep, 2500); // 保险机制
         window.speechSynthesis.speak(praiseAudio);
     }
 
-    // E. 语音合成设置 (赞美专用)
-    function highEnergySpeak(text, isPraise = false) {
-        const utter = new SpeechSynthesisUtterance(text);
-        utter.lang = 'en-US';
-        if (isPraise) {
-            utter.rate = 1.2; utter.pitch = 1.4; 
-        } else {
-            utter.rate = 0.8; utter.pitch = 1.0;
-        }
-        return utter;
-    }
-
-    // F. 界面渲染函数
     function render() {
+        isTransitioning = false; 
+        cleanupSpeech(); // 严谨清理旧环境
+
         const view = document.getElementById('game-view');
-        const wordObj = WORDS[curIdx];
+        const wordObj = todayWords[curIdx];
+        if (!wordObj) return;
         
-        document.getElementById('bar').style.width = `${(curIdx / WORDS.length) * 100}%`;
-        document.getElementById('progress-info').innerText = `${curIdx + 1} / ${WORDS.length}`;
+        document.getElementById('bar').style.width = `${(curIdx / todayWords.length) * 100}%`;
+        document.getElementById('progress-info').innerText = `第 ${currentDay} 天 | ${curIdx + 1} / ${todayWords.length} 词`;
 
         if (curPhase === 1) {
             stars = 0;
-            // [修复 Bug 2] 添加 onclick 和 ontouchstart 实现移动端手动唤起
+            let reqStars = wordObj.requiredStars;
+            let starsHTML = '';
+            for(let i=0; i<reqStars; i++) starsHTML += `<span class="star">★</span>`;
+            
+            let difficultyText = wordObj.isNew ? "✨ 今日新词学习" : (reqStars === 3 ? "🔥 强力记忆巩固" : "✅ 轻松复习过关");
+
             view.innerHTML = `
+                <div style="font-size: 14px; color: var(--secondary); margin-bottom: 5px; font-weight:bold;">${difficultyText}</div>
                 <div class="word-card">
                     <div class="syllables">${wordObj.syllables}</div>
                     <h1 class="word-main">${wordObj.word}</h1>
                     <div class="meaning">${wordObj.meaning}</div>
                 </div>
-                <div class="stars-row" id="star-row">
-                    <span class="star">★</span><span class="star">★</span><span class="star">★</span>
-                </div>
+                <div class="stars-row" id="star-row">${starsHTML}</div>
                 <div class="mic-icon" id="mic-box" style="cursor:pointer;" onclick="manualStartMic(event)" ontouchstart="manualStartMic(event)">🎤</div>
-                <p style="color:#CCC; font-size:14px; text-align:center;">APP读完后请跟读<br/>(如果没听清，可点击麦克风重试)</p>
+                <p style="color:#CCC; font-size:14px; text-align:center;">APP读完后请跟读<br/>(没听清可点击麦克风重试)</p>
             `;
             startStepLoop();
         } 
@@ -395,41 +438,43 @@
         }
     }
 
-    // G. 其他辅助功能
-    function showModal(title, text, icon) {
-        document.getElementById('modal-title').innerText = title;
-        document.getElementById('modal-text').innerText = text;
-        document.getElementById('modal-icon').innerText = icon;
-        document.getElementById('msg-modal').style.display = 'flex';
+    /* =========================================
+       4. 基础辅助与 UI 函数
+       ========================================= */
+    function resetMicUI() {
+        const mic = document.getElementById('mic-box');
+        if (mic) mic.classList.remove('listening');
     }
 
-    function closeModal() {
-        document.getElementById('msg-modal').style.display = 'none';
+    function highEnergySpeak(text, isPraise = false) {
+        const utter = new SpeechSynthesisUtterance(text);
+        utter.lang = 'en-US';
+        utter.rate = isPraise ? 1.2 : 0.8; 
+        utter.pitch = isPraise ? 1.4 : 1.0;
+        return utter;
     }
 
     function repeatWord() {
-        window.speechSynthesis.speak(highEnergySpeak(WORDS[curIdx].word));
+        try { window.speechSynthesis.cancel(); } catch(e){}
+        window.speechSynthesis.speak(highEnergySpeak(todayWords[curIdx].word));
     }
 
     function renderChoices(correct) {
         let choices = [correct];
-        while(choices.length < 4) {
-            let r = WORDS[Math.floor(Math.random()*WORDS.length)];
-            if(!choices.find(x => x.word === r.word)) choices.push(r);
-        }
-        choices.sort(() => Math.random() - 0.5);
+        let available = ALL_WORDS.filter(x => x.word !== correct.word);
+        available.sort(() => Math.random() - 0.5); // 随机打乱备用词
+        choices.push(...available.slice(0, 3));
+        choices.sort(() => Math.random() - 0.5); // 混淆四个选项
+        
         const box = document.getElementById('opt-box');
         choices.forEach(c => {
             const btn = document.createElement('div');
-            btn.className = 'opt-btn';
-            btn.innerText = c.meaning;
+            btn.className = 'opt-btn'; btn.innerText = c.meaning;
             btn.onclick = () => {
                 if(c.word === correct.word) {
-                    btn.classList.add('correct');
-                    handleSuccess();
+                    btn.classList.add('correct'); handleSuccess();
                 } else {
-                    btn.style.borderColor = 'red';
-                    repeatWord();
+                    btn.style.borderColor = 'red'; repeatWord();
                 }
             };
             box.appendChild(btn);
@@ -437,12 +482,12 @@
     }
 
     function checkSpell() {
-        const val = document.getElementById('speller').value.toLowerCase().trim();
-        if(val === WORDS[curIdx].word.toLowerCase()) {
-            handleSuccess();
+        const input = document.getElementById('speller');
+        const val = input.value.toLowerCase().trim();
+        if(val === todayWords[curIdx].word.toLowerCase()) {
+            input.blur(); handleSuccess(); // 成功时收起键盘
         } else {
-            document.getElementById('speller').style.borderColor = 'red';
-            repeatWord();
+            input.style.borderColor = 'red'; repeatWord();
         }
     }
 
@@ -453,33 +498,43 @@
 
     function renderFeedback(txt) {
         const p = document.getElementById('praise-popup');
-        p.innerText = txt;
-        p.classList.add('animate');
+        p.innerText = txt; p.classList.add('animate');
         setTimeout(() => p.classList.remove('animate'), 800);
     }
 
     function playDing() {
-        const ctx = new (window.AudioContext || window.webkitAudioContext)();
-        const osc = ctx.createOscillator();
-        const g = ctx.createGain();
-        osc.connect(g); g.connect(ctx.destination);
-        osc.frequency.setValueAtTime(880, ctx.currentTime);
-        osc.frequency.exponentialRampToValueAtTime(1200, ctx.currentTime + 0.1);
-        g.gain.setValueAtTime(0.05, ctx.currentTime);
-        g.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.3);
-        osc.start(); osc.stop(ctx.currentTime + 0.3);
+        try {
+            const ctx = new (window.AudioContext || window.webkitAudioContext)();
+            const osc = ctx.createOscillator(); const g = ctx.createGain();
+            osc.connect(g); g.connect(ctx.destination);
+            osc.frequency.setValueAtTime(880, ctx.currentTime);
+            osc.frequency.exponentialRampToValueAtTime(1200, ctx.currentTime + 0.1);
+            g.gain.setValueAtTime(0.05, ctx.currentTime);
+            g.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.3);
+            osc.start(); osc.stop(ctx.currentTime + 0.3);
+        } catch(e) {}
     }
 
-    function showWin() {
-        const win = document.getElementById('win-screen');
-        if(!win) { // 简单兜底
-             alert("恭喜！今天的任务全部完成！");
-             location.reload();
-             return;
-        }
-        win.style.display = 'flex';
+    function showModal(title, text, icon) {
+        document.getElementById('modal-title').innerText = title;
+        document.getElementById('modal-text').innerText = text;
+        document.getElementById('modal-icon').innerText = icon;
+        document.getElementById('msg-modal').style.display = 'flex';
     }
 
+    function closeModal() { document.getElementById('msg-modal').style.display = 'none'; }
+
+    function showWin(msg) {
+        cleanupSpeech();
+        document.getElementById('header-area').style.display = 'none';
+        const app = document.getElementById('game-view');
+        app.innerHTML = `
+            <div style="font-size: 80px; margin-bottom: 20px;">🏆</div>
+            <h1 style="font-size: 28px; text-align:center; padding:0 20px; line-height: 1.5; color: var(--primary);">${msg}</h1>
+            <p style="margin-top:20px; font-size: 20px; color:#A0A0A0">当前打卡天数: ${currentDay} 天</p>
+            <button onclick="devNextDay()" style="background:var(--secondary); color:white; border:none; padding:18px 50px; border-radius:50px; font-size:20px; font-weight:bold; margin-top:40px; cursor:pointer;">开启明天的冒险</button>
+        `;
+    }
 </script>
 </body>
 </html>
